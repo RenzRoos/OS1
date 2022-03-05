@@ -1,52 +1,71 @@
 #include <sys/types.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <string.h> 
 
 #define len 1000
 
-int main(int argc, char ** argv) {
+char * tokenizer(char * token, char input[]){
+
+    token = strtok(input, "|");
+
+    return token;
+}
+
+int main() {
     pid_t pid;
     char buf[len];
 
-    char binaryPath[len] = "/bin/";
-    char token[len];
+    char input[len];
+    char * token;
+       
 
-    fgets(token, sizeof(token), stdin);
+    while(1){
+        printf("Command?\n");
+        fgets(input, len, stdin);
+        input[strlen(input) - 1] = '\0';
 
-    while (1){
-        pid = fork();
-        if(pid < 0){
-            fprintf(stderr, "Fork failed");
-            return 1;
-        }
-        else if(pid == 0 && strcmp(token, "ls") == 0){
-            char *args[] = {binaryPath, ".", NULL};
-            strcat(binaryPath, token);
-            execv(binaryPath, args);
-            return 0;
-        }
-        else if(pid == 0 && strcmp(token, "exit") == 0){
-            return 0;
-        }
-        else if(pid == 0 && strcmp(token, "cd") == 0){
+        token = tokenizer(token, input);
+                    
 
-            fgets(token, sizeof(token), stdin);
+        while(token != NULL) {
+            pid = fork();
+            while(token[0] == ' '){
+                token = token + 1;
+            }
 
-            printf("%s\n", getcwd(buf, len));
+            if(pid < 0){
+                fprintf(stderr, "Fork failed");
+                return 1;
+            }
+            else if(pid == 0 && strncmp(token, "ls", 2) == 0){
+                char *args[] = {"/bin/ls", ".", NULL};
+                execv("/bin/ls", args);
+            }
+            else if(pid == 0 && strncmp(token, "exit", 4) == 0){
+                exit(0);
+            }
+            else if(pid == 0 && strncmp(token, "cd", 2) == 0){
+                
+                char * temp = token + 3;
+                while(temp[0] == ' '){
+                    temp = temp + 1;
+                }
+                while(temp[strlen(temp) - 1] == ' '){
+                    temp[strlen(temp) - 1] = '\0';
+                }
+                printf("temp:%s6\n", temp);
+                chdir(temp);
+            }
+            else{
+                wait(NULL);
+                printf("Child complete\n");
+            }
             
-            // using the command
-            chdir(token);
-        
-            // printing current working directory
-            printf("%s\n", getcwd(buf, len));
+            token = strtok(NULL, "|");
         }
-        else{
-            wait(NULL);
-            printf("Child complete\n");
-        }
-        fgets(token, sizeof(token), stdin);
-        char binaryPath[len] = "/bin/";
     }
+    return 0;
 }
