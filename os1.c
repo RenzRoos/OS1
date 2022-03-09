@@ -33,11 +33,11 @@ int tokenizer(char * token[len], char input[], int * pipeline){
 }
 
 int main() {
-
-
+    printf("HALLO\n");
     while(1){
 
         pid_t pid;
+        pid_t pid2;
 
         char input[len];
         char * token[len];
@@ -59,16 +59,15 @@ int main() {
         pid = fork();
 
         if(pid < 0){
-            fprintf(stderr, "Fork failed");
+            fprintf(stderr, "Fork failed\n");
             return 1;
         }
-        else if(pid == 0 && strncmp(token[i], "exit", 4) == 0){
+        else if(strncmp(token[i], "exit", 4) == 0){
             return 0;
         }
         else if(pid == 0 && strncmp(token[i], "cd", 2) == 0){
             i++;
             char * temp = token[i];
-            printf("%s",token[i]);
             while(temp[0] == ' '){
                 temp = temp + 1;
             }
@@ -77,13 +76,15 @@ int main() {
             }
             chdir(temp);
         }
-        else if(pid == 0){
+        else if(pid == 0 || pid2 == 0){
             char path[len] = "/bin/";
             char arguments[len] = "\0";
             char flags[len] = "\0";
 
-            strncat(path, token[i], len);
-            i++;
+            if(token[i][0] != '.' && token[i][1] != '/'){ 
+                strncat(path, token[i], len);
+                i++;
+            }
 
             int multi_arg = 0;
             
@@ -99,7 +100,7 @@ int main() {
 
             multi_arg = 0;
 
-            while(i < token_size){
+            while(i < token_size && token[i][0] != '|'){
                 if(multi_arg == 1){
                     strncat(arguments, " ", strlen(arguments) + 1);
                 }
@@ -108,9 +109,17 @@ int main() {
 
                 multi_arg = 1;
             }
-                
+            
             char *args[4] = {path, flags, arguments, NULL};
-            if(flags[0] == '\0' && arguments[0] == '\0'){
+            
+            if(strncmp(path,"/bin/", strlen(path)) == 0){
+                memset(path, 0, strlen(path));
+                strncat(path, arguments, strlen(arguments));
+                args[0] = NULL;
+                args[1] = NULL;
+                args[2] = NULL;
+            }
+            else if(flags[0] == '\0' && arguments[0] == '\0'){
                 args[1] = NULL;
                 args[2] = NULL;
             }
@@ -120,6 +129,10 @@ int main() {
             }
             else if(arguments[0] == '\0'){
                 args[2] = NULL;
+            }
+
+            if(token[i][0] == '|'){
+                pid2 = fork();
             }
             execv(path, args);
         }

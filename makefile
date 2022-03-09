@@ -1,8 +1,8 @@
-all: ls.o 
-	gcc -Wall -Wextra -g -o ls ls.o 
+all: os1.o 
+	gcc -Wall -Wextra -g -o os1 os1.o 
 main.o: ls.c
-	gcc -Wall -Wextra -g -c ls.c
+	gcc -Wall -Wextra -g -c os1.c
 clean:
-	rm -f ls
-	rm -f ls.o
+	rm -f os1
+	rm -f os1.o
 	
