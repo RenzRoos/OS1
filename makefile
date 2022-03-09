@@ -5,4 +5,3 @@ main.o: ls.c
 clean:
 	rm -f os1
 	rm -f os1.o
-	
