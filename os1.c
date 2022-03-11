@@ -1,4 +1,5 @@
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -74,11 +75,43 @@ void path_arguments_flags_setter(char path[len], char flags[len], char arguments
     }
 }
 
+
+void bin_finder(char bin_path[]){
+    struct stat buf;
+    char * path;
+    path = strtok(getenv("PATH"), ":");
+    char * temp[len];
+    int i = 0;
+    
+    while(path != NULL){ 
+        temp[i] = path;
+        i++;
+        path = strtok(NULL, ":");
+    }
+
+    for(int j = 0; j < i; j++){
+        strncat(temp[j], "/ls", strlen(temp[j]) + 3);
+        if(stat(temp[j], &buf) == 0){
+            i = j;
+            break;
+        }
+    }
+    temp[i][strlen(temp[i])-1] = '\0';
+    temp[i][strlen(temp[i])-1] = '\0';
+
+    for(int j = 0; j < strlen(temp[i]); j++){
+        bin_path[j] = temp[i][j];
+    }
+    bin_path[strlen(temp[i])] = '\0';
+
+
+    return;
+}
+
 void args_setter(char *args[4], char path[len], char flags[len], char arguments[len]){
-    if(strncmp(path,"/bin/", strlen(path)) == 0){
+    if(args[2][0] == '.' && args[2][1] == '/'){
         memset(path, 0, strlen(path));
         strncat(path, arguments, strlen(arguments));
-        args[0] = NULL;
         args[1] = NULL;
         args[2] = NULL;
     }
@@ -96,6 +129,8 @@ void args_setter(char *args[4], char path[len], char flags[len], char arguments[
 }
 
 int main() {
+    char bin_path[len];
+    bin_finder(bin_path);
 
     while(1){
 
@@ -132,19 +167,18 @@ int main() {
             cd(token, &i);
         }
         else if(pid == 0 || pid2 == 0){
-            char path[len] = "/bin/";
+            char path[len];
             char arguments[len] = "\0";
             char flags[len] = "\0";
+
+            memset(path, 0, strlen(path));
+            strncpy(path, bin_path, strlen(bin_path));
 
             path_arguments_flags_setter(path, flags, arguments, token, token_size, &i);
             
             char *args[4] = {path, flags, arguments, NULL};
         
             args_setter(args, path, flags, arguments);
-
-            if(token[i][0] == '|'){
-                pid2 = fork();
-            }
 
             execv(path, args);
         }
