@@ -46,13 +46,8 @@ void cd(char * token[], int * i){
 } 
 
 void path_arguments_flags_setter(char path[len], char flags[len], char arguments[len], char * token[], int token_size, int * i){
-    if(token[*i][0] != '.' && token[*i][1] != '/'){ 
-        strncat(path, token[*i], len);
-        (*i)++;
-    }
-
     int multi_arg = 0;
-    
+    (*i)++;
     while(*i < token_size && token[*i][0] == '-'){
         if(multi_arg == 1){
             strncat(flags, " ", strlen(flags) + 1);
@@ -75,12 +70,10 @@ void path_arguments_flags_setter(char path[len], char flags[len], char arguments
     }
 }
 
-
-void bin_finder(char bin_path[]){
+int env_finder(char * temp[len]){
     struct stat buf;
     char * path;
     path = strtok(getenv("PATH"), ":");
-    char * temp[len];
     int i = 0;
     
     while(path != NULL){ 
@@ -89,21 +82,31 @@ void bin_finder(char bin_path[]){
         path = strtok(NULL, ":");
     }
 
+    return i;
+}
+
+void bin_finder(char bin_path[], char * token, char * temp[len], int i){
+    struct stat buf;
+
+    char temp2[len] = "\0";
+
     for(int j = 0; j < i; j++){
-        strncat(temp[j], "/ls", strlen(temp[j]) + 3);
-        if(stat(temp[j], &buf) == 0){
+        
+        strncat(temp2, temp[j], strlen(temp[j])); 
+           
+
+        strncat(temp2, "/", strlen(temp2) + 1);
+
+        strncat(temp2, token, strlen(temp2) + strlen(token));
+
+        if(stat(temp2, &buf) == 0){
             i = j;
             break;
         }
+        memset(temp2, 0, strlen(temp2));
     }
-    temp[i][strlen(temp[i])-1] = '\0';
-    temp[i][strlen(temp[i])-1] = '\0';
 
-    for(int j = 0; j < strlen(temp[i]); j++){
-        bin_path[j] = temp[i][j];
-    }
-    bin_path[strlen(temp[i])] = '\0';
-
+    strncat(bin_path, temp2, strlen(temp2));
 
     return;
 }
@@ -129,9 +132,8 @@ void args_setter(char *args[4], char path[len], char flags[len], char arguments[
 }
 
 int main() {
-    char bin_path[len];
-    bin_finder(bin_path);
-
+    char * temp[len];
+    int temp_size = env_finder(temp);
     while(1){
 
         pid_t pid;
@@ -153,31 +155,35 @@ int main() {
 
         input[strlen(input) - 1] = '\0';
         token_size = tokenizer(token, input, &pipeline);
-        
+
+        char bin_path[len];
+        memset(bin_path, 0, strlen(bin_path));
+        bin_finder(bin_path, token[i], temp, temp_size);
+
         pid = fork();
 
-        if(pid < 0 || pid2 < 0){
+        if(pid < 0 ){
             fprintf(stderr, "Fork failed\n");
             return 1;
         }
         else if(strncmp(token[i], "exit", 4) == 0){
             return 0;
         }
-        else if( (pid == 0 || pid2 == 0) && strncmp(token[i], "cd", 2) == 0){
+        else if(pid == 0 && (strncmp(token[i], "cd", 2) == 0)){
             cd(token, &i);
         }
-        else if(pid == 0 || pid2 == 0){
+        else if(pid == 0){
             char path[len];
             char arguments[len] = "\0";
             char flags[len] = "\0";
 
             memset(path, 0, strlen(path));
             strncpy(path, bin_path, strlen(bin_path));
-
             path_arguments_flags_setter(path, flags, arguments, token, token_size, &i);
             
+            
             char *args[4] = {path, flags, arguments, NULL};
-        
+
             args_setter(args, path, flags, arguments);
 
             execv(path, args);
