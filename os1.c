@@ -68,7 +68,8 @@ void path_arguments_flags_setter(char path[len], char flags[len], char arguments
 
         multi_arg = 1;
     }
-    
+    printf("I: %i\n", *i);
+     printf("token: %s\n", token[*i]);
 }
 
 int env_finder(char * temp[len]){
@@ -189,6 +190,7 @@ int main() {
             
             memset(bin_path, 0, strlen(bin_path));
             bin_finder(bin_path, token[i], temp, temp_size);
+            printf("BIN: %s\n", bin_path);
             if( strlen(bin_path) == 0 ){
                 wrong_input(&i, token_size, &pipeline);
             }
@@ -208,7 +210,7 @@ int main() {
             execv(path, args);
         }
         
-        if(pipeline == 1){
+        while(pipeline == 1 && token[i][0] != '|'){
             i++;
         }
 
@@ -233,21 +235,25 @@ int main() {
                 
                 memset(bin_path, 0, strlen(bin_path));
                 bin_finder(bin_path, token[i], temp, temp_size);
+                printf("BIN: %s\n", bin_path);
+
                 if( strlen(bin_path) == 0 ){
                     wrong_input(&i, token_size, &pipeline);
                 }
-                memset(path, 0, strlen(path));
-                strncpy(path, bin_path, strlen(bin_path));
-                path_arguments_flags_setter(path, flags, arguments, token, token_size, &i);
-                char *args[4] = {path, flags, arguments, NULL};
+                else{
+                    memset(path, 0, strlen(path));
+                    strncpy(path, bin_path, strlen(bin_path));
+                    path_arguments_flags_setter(path, flags, arguments, token, token_size, &i);
+                    char *args[4] = {path, flags, arguments, NULL};
 
-                args_setter(args, path, flags, arguments);
+                    args_setter(args, path, flags, arguments);
 
-                dup2(pipefd[0], STDIN_FILENO);
-                close(pipefd[0]);
-                close(pipefd[1]);
+                    dup2(pipefd[0], STDIN_FILENO);
+                    close(pipefd[0]);
+                    close(pipefd[1]);
 
-                execv(path, args);
+                    execv(path, args);
+                }
             }
         }
        
