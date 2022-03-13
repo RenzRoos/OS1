@@ -68,6 +68,7 @@ void path_arguments_flags_setter(char path[len], char flags[len], char arguments
 
         multi_arg = 1;
     }
+    
 }
 
 int env_finder(char * temp[len]){
@@ -131,6 +132,13 @@ void args_setter(char *args[4], char path[len], char flags[len], char arguments[
     }
 }
 
+void wrong_input(int * i, int token_size, int * pipeline){
+    fprintf(stderr, "Incorrect input\n");
+    *i = token_size;
+    *pipeline = 0;
+    return;
+}
+
 int main() {
     char * temp[len];
     int temp_size = env_finder(temp);
@@ -147,6 +155,11 @@ int main() {
         int pipeline = 0;
         int pipefd[2];
 
+        if(pipe(pipefd) == -1){
+            fprintf(stderr, "Pipe failed\n");
+            return 1;
+        }
+
         char cwd[len];
         getcwd(cwd, sizeof(cwd));
         printf("%s >>> ", cwd);
@@ -156,17 +169,13 @@ int main() {
         input[strlen(input) - 1] = '\0';
         token_size = tokenizer(token, input, &pipeline);
 
-        char bin_path[len];
-        memset(bin_path, 0, strlen(bin_path));
-        bin_finder(bin_path, token[i], temp, temp_size);
-
         pid = fork();
 
         if(pid < 0 ){
             fprintf(stderr, "Fork failed\n");
             return 1;
         }
-        else if(strncmp(token[i], "exit", 4) == 0){
+        else if(strncmp(token[i], "exit", 4) == 0 && pipeline == 0){
             return 0;
         }
         else if(pid == 0 && (strncmp(token[i], "cd", 2) == 0)){
@@ -176,23 +185,80 @@ int main() {
             char path[len];
             char arguments[len] = "\0";
             char flags[len] = "\0";
-
+            char bin_path[len];
+            
+            memset(bin_path, 0, strlen(bin_path));
+            bin_finder(bin_path, token[i], temp, temp_size);
+            if( strlen(bin_path) == 0 ){
+                wrong_input(&i, token_size, &pipeline);
+            }
+            
             memset(path, 0, strlen(path));
             strncpy(path, bin_path, strlen(bin_path));
             path_arguments_flags_setter(path, flags, arguments, token, token_size, &i);
             
-            
             char *args[4] = {path, flags, arguments, NULL};
 
             args_setter(args, path, flags, arguments);
-
+            if(pipeline == 1){
+                dup2(pipefd[1], STDOUT_FILENO);
+                close(pipefd[0]);
+                close(pipefd[1]);
+            }
             execv(path, args);
         }
-        else{
-            wait(NULL);
-            printf("Child complete\n");
-        }            
         
+        if(pipeline == 1){
+            i++;
+        }
+
+        if(strncmp(token[i], "|", 1) == 0){
+            i++;
+            pid2 = fork();
+            if(pid2 < 0 ){
+                fprintf(stderr, "Fork failed\n");
+                return 1;
+            }
+            else if(strncmp(token[i], "exit", 4) == 0){
+                return 0;
+            }
+            else if(pid2 == 0 && (strncmp(token[i], "cd", 2) == 0)){
+                cd(token, &i);
+            }
+            else if(pid2 == 0){
+                char path[len];
+                char arguments[len] = "\0";
+                char flags[len] = "\0";
+                char bin_path[len];
+                
+                memset(bin_path, 0, strlen(bin_path));
+                bin_finder(bin_path, token[i], temp, temp_size);
+                if( strlen(bin_path) == 0 ){
+                    wrong_input(&i, token_size, &pipeline);
+                }
+                memset(path, 0, strlen(path));
+                strncpy(path, bin_path, strlen(bin_path));
+                path_arguments_flags_setter(path, flags, arguments, token, token_size, &i);
+                char *args[4] = {path, flags, arguments, NULL};
+
+                args_setter(args, path, flags, arguments);
+
+                dup2(pipefd[0], STDIN_FILENO);
+                close(pipefd[0]);
+                close(pipefd[1]);
+
+                execv(path, args);
+            }
+        }
+       
+        if(pipeline == 1){
+            close(pipefd[0]);
+            close(pipefd[1]);
+        }
+        waitpid(pid, NULL, 0);
+        if(pipeline == 1){
+            waitpid(pid2, NULL, 0);
+        }
     }
     return 0;
 }
