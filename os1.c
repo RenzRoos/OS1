@@ -68,8 +68,7 @@ void path_arguments_flags_setter(char path[len], char flags[len], char arguments
 
         multi_arg = 1;
     }
-    printf("I: %i\n", *i);
-     printf("token: %s\n", token[*i]);
+
 }
 
 int env_finder(char * temp[len]){
@@ -190,7 +189,6 @@ int main() {
             
             memset(bin_path, 0, strlen(bin_path));
             bin_finder(bin_path, token[i], temp, temp_size);
-            printf("BIN: %s\n", bin_path);
             if( strlen(bin_path) == 0 ){
                 wrong_input(&i, token_size, &pipeline);
             }
@@ -235,7 +233,6 @@ int main() {
                 
                 memset(bin_path, 0, strlen(bin_path));
                 bin_finder(bin_path, token[i], temp, temp_size);
-                printf("BIN: %s\n", bin_path);
 
                 if( strlen(bin_path) == 0 ){
                     wrong_input(&i, token_size, &pipeline);
