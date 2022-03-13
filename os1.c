@@ -8,6 +8,7 @@
 
 #define len 1000
 
+//Split input string into an array
 int tokenizer(char * token[len], char input[], int * pipeline){
 
     int i = 0;
@@ -33,6 +34,7 @@ int tokenizer(char * token[len], char input[], int * pipeline){
     return i;
 }
 
+//Change dir
 void cd(char * token[], int * i){
     (*i)++;    
     char * temp = token[*i];
@@ -45,7 +47,8 @@ void cd(char * token[], int * i){
     chdir(temp);
 } 
 
-void path_arguments_flags_setter(char path[len], char flags[len], char arguments[len], char * token[], int token_size, int * i){
+//Handling the input of the flags and arguments for the commands
+void arguments_flags_setter( char flags[len], char arguments[len], char * token[], int token_size, int * i){
     int multi_arg = 0;
     (*i)++;
     while(*i < token_size && token[*i][0] == '-'){
@@ -71,6 +74,7 @@ void path_arguments_flags_setter(char path[len], char flags[len], char arguments
 
 }
 
+//Get env and split it into an array
 int env_finder(char * temp[len]){
     struct stat buf;
     char * path;
@@ -86,6 +90,7 @@ int env_finder(char * temp[len]){
     return i;
 }
 
+//Find path of command to execute
 void bin_finder(char bin_path[], char * token, char * temp[len], int i){
     struct stat buf;
 
@@ -112,6 +117,7 @@ void bin_finder(char bin_path[], char * token, char * temp[len], int i){
     return;
 }
 
+//Put args in correct order
 void args_setter(char *args[4], char path[len], char flags[len], char arguments[len]){
     if(args[2][0] == '.' && args[2][1] == '/'){
         memset(path, 0, strlen(path));
@@ -132,6 +138,7 @@ void args_setter(char *args[4], char path[len], char flags[len], char arguments[
     }
 }
 
+//Displays error message
 void wrong_input(int * i, int token_size, int * pipeline){
     fprintf(stderr, "Incorrect input\n");
     *i = token_size;
@@ -139,48 +146,59 @@ void wrong_input(int * i, int token_size, int * pipeline){
     return;
 }
 
+//Main
 int main() {
     char * temp[len];
     int temp_size = env_finder(temp);
     while(1){
 
+        //process
         pid_t pid;
         pid_t pid2;
 
+        //input handling
         char input[len];
         char * token[len];
         int token_size;
         int i = 0;
         
+        //pipelining
         int pipeline = 0;
         int pipefd[2];
 
+        //error pipe
         if(pipe(pipefd) == -1){
             fprintf(stderr, "Pipe failed\n");
             return 1;
         }
 
+        //ui with cwd
         char cwd[len];
         getcwd(cwd, sizeof(cwd));
         printf("%s >>> ", cwd);
         
+        //get input
         fgets(input, len, stdin);
-
         input[strlen(input) - 1] = '\0';
         token_size = tokenizer(token, input, &pipeline);
 
+        //fork process
         pid = fork();
 
+        //error process
         if(pid < 0 ){
             fprintf(stderr, "Fork failed\n");
             return 1;
         }
+        //quit program
         else if(strncmp(token[i], "exit", 4) == 0 && pipeline == 0){
             return 0;
         }
+        //change dir
         else if(pid == 0 && (strncmp(token[i], "cd", 2) == 0)){
             cd(token, &i);
         }
+        //all other comamnds
         else if(pid == 0){
             char path[len];
             char arguments[len] = "\0";
@@ -189,42 +207,54 @@ int main() {
             
             memset(bin_path, 0, strlen(bin_path));
             bin_finder(bin_path, token[i], temp, temp_size);
+
             if( strlen(bin_path) == 0 ){
                 wrong_input(&i, token_size, &pipeline);
             }
             
             memset(path, 0, strlen(path));
             strncpy(path, bin_path, strlen(bin_path));
-            path_arguments_flags_setter(path, flags, arguments, token, token_size, &i);
+            arguments_flags_setter(flags, arguments, token, token_size, &i);
             
             char *args[4] = {path, flags, arguments, NULL};
 
             args_setter(args, path, flags, arguments);
+
+            //input pipe if needed
             if(pipeline == 1){
                 dup2(pipefd[1], STDOUT_FILENO);
                 close(pipefd[0]);
                 close(pipefd[1]);
             }
+            //execute command
             execv(path, args);
         }
         
+        //get to the pipeline split
         while(pipeline == 1 && token[i][0] != '|'){
             i++;
         }
 
+        //command after pipe
         if(strncmp(token[i], "|", 1) == 0){
             i++;
+
+            //fork process
             pid2 = fork();
+            //error process
             if(pid2 < 0 ){
                 fprintf(stderr, "Fork failed\n");
                 return 1;
             }
+            //quit program
             else if(strncmp(token[i], "exit", 4) == 0){
                 return 0;
             }
+            //change dir
             else if(pid2 == 0 && (strncmp(token[i], "cd", 2) == 0)){
                 cd(token, &i);
             }
+            //all other commands
             else if(pid2 == 0){
                 char path[len];
                 char arguments[len] = "\0";
@@ -240,20 +270,23 @@ int main() {
                 else{
                     memset(path, 0, strlen(path));
                     strncpy(path, bin_path, strlen(bin_path));
-                    path_arguments_flags_setter(path, flags, arguments, token, token_size, &i);
+                    arguments_flags_setter(flags, arguments, token, token_size, &i);
                     char *args[4] = {path, flags, arguments, NULL};
 
                     args_setter(args, path, flags, arguments);
 
+                    //take input from pipe
                     dup2(pipefd[0], STDIN_FILENO);
                     close(pipefd[0]);
                     close(pipefd[1]);
-
+                    
+                    //execute command
                     execv(path, args);
                 }
             }
         }
        
+       //parent process
         if(pipeline == 1){
             close(pipefd[0]);
             close(pipefd[1]);
